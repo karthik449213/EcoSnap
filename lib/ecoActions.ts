@@ -31,24 +31,39 @@ const fetchLocation = async () => {
 };
 
 export const logEcoAction = async (photoUri: string) => {
+  console.log('[logEcoAction] Starting action log for photo:', photoUri);
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
+  if (sessionError) {
+    console.error('[logEcoAction] Session error:', sessionError);
+    throw sessionError;
+  }
   const session = sessionData.session;
-  if (!session) throw new Error('You need to sign in first.');
+  if (!session) {
+    console.error('[logEcoAction] No active session');
+    throw new Error('You need to sign in first.');
+  }
   const userId = session.user.id;
+  console.log('[logEcoAction] User ID:', userId);
 
   const { lat, lon } = await fetchLocation();
+  console.log('[logEcoAction] Location:', lat, lon);
   const response = await fetch(photoUri);
   const blob = await response.blob();
   const extension = photoUri.split('.').pop()?.split('?')[0] || 'jpg';
   const path = `${userId}/${Date.now()}.${extension}`;
+  console.log('[logEcoAction] Uploading to storage:', path);
 
   const { error: uploadError } = await supabase.storage
     .from('eco-action-images')
     .upload(path, blob, { contentType: blob.type || 'image/jpeg' });
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    console.error('[logEcoAction] Upload error:', uploadError);
+    throw uploadError;
+  }
+  console.log('[logEcoAction] Upload successful');
 
   const today = todayString();
+  console.log('[logEcoAction] Inserting action record for date:', today);
   const { error: actionError } = await supabase.from('eco_actions').insert({
     user_id: userId,
     image_url: path,
@@ -56,16 +71,25 @@ export const logEcoAction = async (photoUri: string) => {
     longitude: lon,
     action_date: today,
   });
-  if (actionError) throw actionError;
+  if (actionError) {
+    console.error('[logEcoAction] Insert action error:', actionError);
+    throw actionError;
+  }
+  console.log('[logEcoAction] Action record inserted');
 
   const { data: streakRow, error: streakFetchError } = await supabase
     .from('streaks')
     .select('current_streak, last_action_date')
     .eq('user_id', userId)
     .maybeSingle();
-  if (streakFetchError) throw streakFetchError;
+  if (streakFetchError) {
+    console.error('[logEcoAction] Streak fetch error:', streakFetchError);
+    throw streakFetchError;
+  }
+  console.log('[logEcoAction] Current streak data:', streakRow);
 
   const nextStreak = computeNextStreak(streakRow?.current_streak ?? 0, streakRow?.last_action_date ?? null, today);
+  console.log('[logEcoAction] Next streak:', nextStreak);
 
   const { error: streakUpsertError } = await supabase.from('streaks').upsert({
     user_id: userId,
@@ -73,7 +97,11 @@ export const logEcoAction = async (photoUri: string) => {
     last_action_date: today,
     updated_at: new Date().toISOString(),
   });
-  if (streakUpsertError) throw streakUpsertError;
+  if (streakUpsertError) {
+    console.error('[logEcoAction] Streak upsert error:', streakUpsertError);
+    throw streakUpsertError;
+  }
+  console.log('[logEcoAction] Action logged successfully, streak:', nextStreak);
 
   return { streak: nextStreak };
 };

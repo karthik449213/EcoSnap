@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export const AuthScreen: React.FC = () => {
   const router = useRouter();
@@ -14,46 +14,45 @@ export const AuthScreen: React.FC = () => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
-
-  const redirectIfSession = useCallback(async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return;
-    if (data.session) {
-      router.replace('/home');
-    }
-  }, [router]);
-
-  useEffect(() => {
-    redirectIfSession();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        router.replace('/home');
-      }
-    });
-    return () => {
-      listener?.subscription?.unsubscribe();
-    };
-  }, [redirectIfSession, router]);
+  const [navigating, setNavigating] = useState(false);
 
   const handleRequestCode = async () => {
     if (!email.trim()) {
-      Alert.alert('Missing email', 'Enter your email to get a login code.');
+      Alert.alert('Email Required', 'Please enter your email address to receive a login code.');
       return;
     }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
     setIsRequesting(true);
     try {
+      console.log('[AuthScreen] Requesting OTP for:', email.trim().toLowerCase());
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: undefined,
+          shouldCreateUser: mode === 'signup',
         },
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[AuthScreen] OTP request error:', error);
+        throw error;
+      }
+      
+      console.log('[AuthScreen] OTP sent successfully');
       setCodeSent(true);
-      Alert.alert('Check your email', 'We sent a 6-digit code to finish signing in.');
+      Alert.alert(
+        'Check Your Email', 
+        `We sent a 6-digit verification code to ${email.trim().toLowerCase()}. Please check your inbox and spam folder.`
+      );
     } catch (err: any) {
-      Alert.alert('Could not send code', err?.message || 'Please try again.');
+      console.error('[AuthScreen] Request code failed:', err);
+      const errorMessage = err?.message || 'Unable to send verification code. Please check your internet connection and try again.';
+      Alert.alert('Error Sending Code', errorMessage);
     } finally {
       setIsRequesting(false);
     }
@@ -61,32 +60,77 @@ export const AuthScreen: React.FC = () => {
 
   const handleVerifyCode = async () => {
     if (!email.trim() || !code.trim()) {
-      Alert.alert('Missing code', 'Enter the code from your email.');
+      Alert.alert('Code Required', 'Please enter the 6-digit code from your email.');
       return;
     }
+    
+    if (code.trim().length !== 6) {
+      Alert.alert('Invalid Code', 'Please enter a valid 6-digit code.');
+      return;
+    }
+    
     if (mode === 'signup' && !username.trim()) {
-      Alert.alert('Missing username', 'Enter a username to complete signup.');
+      Alert.alert('Username Required', 'Please enter a username to complete signup.');
       return;
     }
+    
+    if (navigating) {
+      return; // Prevent multiple navigation attempts
+    }
+
     setIsVerifying(true);
     try {
+      console.log('[AuthScreen] Verifying OTP for:', email.trim().toLowerCase());
       const { data, error } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token: code.trim(),
         type: 'email',
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[AuthScreen] OTP verification error:', error);
+        throw error;
+      }
+      
+      if (!data.session || !data.user) {
+        throw new Error('Authentication failed. No session created.');
+      }
+      
+      console.log('[AuthScreen] OTP verified successfully, user:', data.user.id);
+      console.log('[AuthScreen] Session established:', data.session.access_token ? 'YES' : 'NO');
 
-      if (mode === 'signup' && data.user && username.trim()) {
-        await supabase.from('users_profile').update({
-          username: username.trim(),
-        }).eq('id', data.user.id);
+      // Handle signup profile update
+      if (mode === 'signup' && username.trim()) {
+        console.log('[AuthScreen] Updating username for new user');
+        const { error: profileError } = await supabase
+          .from('users_profile')
+          .update({ username: username.trim() })
+          .eq('id', data.user.id);
+        
+        if (profileError) {
+          console.error('[AuthScreen] Profile update error:', profileError);
+          // Don't block login for profile errors
+        }
       }
 
+      // Navigate to home only after successful session creation
+      setNavigating(true);
+      console.log('[AuthScreen] Navigating to home...');
       router.replace('/home');
     } catch (err: any) {
-      Alert.alert(mode === 'signup' ? 'Signup failed' : 'Sign-in failed', err?.message || 'Invalid or expired code.');
-    } finally {
+      console.error('[AuthScreen] Verification failed:', err);
+      
+      let errorMessage = 'The verification code is invalid or has expired. Please request a new code.';
+      if (err?.message?.includes('network') || err?.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      Alert.alert(
+        mode === 'signup' ? 'Signup Failed' : 'Verification Failed',
+        errorMessage
+      );
       setIsVerifying(false);
     }
   };
@@ -162,13 +206,25 @@ export const AuthScreen: React.FC = () => {
                 style={styles.primary}
                 textStyle={{ opacity: isVerifying ? 0.8 : 1 }}
               />
-              <TouchableOpacity onPress={handleRequestCode} disabled={isRequesting} style={styles.resendBtn}>
-                {isRequesting ? (
-                  <ActivityIndicator color="#065F46" />
-                ) : (
-                  <Text style={styles.resendText}>Resend code</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.actionRow}>
+                <TouchableOpacity onPress={handleRequestCode} disabled={isRequesting} style={styles.resendBtn}>
+                  {isRequesting ? (
+                    <ActivityIndicator color="#065F46" />
+                  ) : (
+                    <Text style={styles.resendText}>Resend code</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setCodeSent(false);
+                    setCode('');
+                    setEmail('');
+                  }} 
+                  style={styles.cancelBtn}
+                >
+                  <Text style={styles.cancelText}>Change email</Text>
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
             <PrimaryButton
@@ -233,12 +289,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   resendBtn: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
   },
   resendText: {
     color: '#047857',
     fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  cancelText: {
+    color: '#64748B',
+    fontWeight: '600',
   },
   toggleRow: {
     flexDirection: 'row',

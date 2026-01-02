@@ -1,66 +1,41 @@
-import React, { useCallback, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { InfoCard } from '@/components/InfoCard';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { StreakBadge } from '@/components/StreakBadge';
+import { Leaderboard } from '@/components/Leaderboard';
+import { SnapHistory } from '@/components/SnapHistory';
+import { useDemoAuth } from '@/lib/demoAuth';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { InfoCard } from '@/components/InfoCard';
-import { StreakBadge } from '@/components/StreakBadge';
-import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
-  const [streak, setStreak] = useState<number | null>(null);
-  const [totalActions, setTotalActions] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentUser, logout } = useDemoAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [email, setEmail] = useState('');
-
-  const loadStats = useCallback(async () => {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    if (!session) {
-      router.replace('/auth');
-      return;
-    }
-    setEmail(session.user.email || '');
-
-    const { data: streakRow } = await supabase
-      .from('streaks')
-      .select('current_streak')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-    setStreak(streakRow?.current_streak ?? 0);
-
-    const { count } = await supabase
-      .from('eco_actions')
-      .select('id', { head: true, count: 'exact' })
-      .eq('user_id', session.user.id);
-    setTotalActions(count ?? 0);
-  }, [router]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setLoading(true);
-      loadStats().finally(() => {
-        if (active) setLoading(false);
-      });
-      return () => {
-        active = false;
-      };
-    }, [loadStats])
-  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadStats().finally(() => setRefreshing(false));
-  }, [loadStats]);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
-  const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    router.replace('/auth');
-  }, [router]);
+  const handleSignOut = useCallback(() => {
+    console.log('[HomeScreen] Signing out...');
+    logout();
+    router.replace('/welcome');
+  }, [router, logout]);
+
+  if (!currentUser) {
+    return (
+      <LinearGradient colors={["#E9F7EF", "#E0F2FE"]} style={styles.container}>
+        <SafeAreaView style={[styles.safe, { justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color="#065F46" />
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={["#E9F7EF", "#E0F2FE"]} style={styles.container}>
@@ -73,32 +48,25 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.headerRow}>
             <View>
               <Text style={styles.greeting}>Welcome back</Text>
-              <Text style={styles.appName}>EcoSnap</Text>
-              {email ? <Text style={styles.email}>{email}</Text> : null}
+              <Text style={styles.appName}>{currentUser.username}</Text>
+              <Text style={styles.email}>{currentUser.email}</Text>
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
-                <Text style={styles.signOutText}>Sign out</Text>
+                <Text style={styles.signOutText}>Switch User</Text>
               </TouchableOpacity>
-              <Image source={require('@/assets/images/EcoSnap.png')} style={styles.avatar} />
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{currentUser.avatar}</Text>
+              </View>
             </View>
           </View>
 
-          {loading ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color="#065F46" />
-              <Text style={styles.loadingText}>Loading your stats…</Text>
-            </View>
-          ) : (
-            <>
-              <StreakBadge streak={streak ?? 0} />
+          <StreakBadge streak={currentUser.streak} />
 
-              <View style={styles.cardRow}>
-                <InfoCard title="Current Streak" value={`${streak ?? 0} days`} subtitle="Keep it going" iconName="flame" />
-                <InfoCard title="Eco Actions" value={`${totalActions ?? 0}`} subtitle="All-time" iconName="leaf" />
-              </View>
-            </>
-          )}
+          <View style={styles.cardRow}>
+            <InfoCard title="Current Streak" value={`${currentUser.streak} days`} subtitle="Keep it going" iconName="flame" />
+            <InfoCard title="Eco Points" value={`${currentUser.ecoPoints}`} subtitle="All-time" iconName="shield-checkmark" />
+          </View>
 
           <View style={styles.heroCard}>
             <Text style={styles.heroTitle}>Snap Eco Action</Text>
@@ -106,10 +74,45 @@ export const HomeScreen: React.FC = () => {
             <PrimaryButton label="Snap Eco Action" onPress={() => router.push('/camera')} />
           </View>
 
+          <TouchableOpacity 
+            style={styles.mapCard}
+            onPress={() => router.push('/map')}
+          >
+            <View style={styles.mapIconContainer}>
+              <Ionicons name="map" size={28} color="#52A675" />
+            </View>
+            <View style={styles.mapContent}>
+              <Text style={styles.mapTitle}>Find Recycling Centers</Text>
+              <Text style={styles.mapSubtitle}>Discover nearby eco-friendly locations</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.achievementsCard}
+            onPress={() => router.push('/achievements')}
+          >
+            <View style={styles.achievementsIconContainer}>
+              <Ionicons name="star" size={28} color="#F59E0B" />
+            </View>
+            <View style={styles.achievementsContent}>
+              <Text style={styles.achievementsTitle}>View Achievements</Text>
+              <Text style={styles.achievementsSubtitle}>Track your progress & unlock badges</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+
           <View style={styles.tipCard}>
             <Text style={styles.tipTitle}>Daily Tip</Text>
             <Text style={styles.tipBody}>Turn off taps while brushing to save up to 4 gallons of water.</Text>
           </View>
+
+          <SnapHistory username={currentUser.username} />
+
+          <Leaderboard 
+            currentUserPoints={currentUser.ecoPoints} 
+            currentUserRank={Math.floor(Math.random() * 500) + 1}
+          />
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -159,6 +162,12 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 16,
+    backgroundColor: '#E0F2F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 28,
   },
   signOutBtn: {
     backgroundColor: 'rgba(220,38,38,0.08)',
@@ -195,6 +204,74 @@ const styles = StyleSheet.create({
   heroCopy: {
     color: '#4B5563',
     lineHeight: 20,
+  },
+  mapCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mapIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#E0F2F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapContent: {
+    flex: 1,
+  },
+  mapTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  mapSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  achievementsCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  achievementsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  achievementsContent: {
+    flex: 1,
+  },
+  achievementsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  achievementsSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
   tipCard: {
     backgroundColor: 'rgba(59, 130, 246, 0.08)',

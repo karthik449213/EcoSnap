@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { logEcoAction } from '@/lib/ecoActions';
 import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const PreviewScreen: React.FC = () => {
   const { photoUri } = useLocalSearchParams<{ photoUri?: string }>();
@@ -17,9 +17,16 @@ export const PreviewScreen: React.FC = () => {
 
   useEffect(() => {
     const ensureSession = async () => {
-      const { data } = await supabase.auth.getSession();
+      console.log('[PreviewScreen] Checking session...');
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('[PreviewScreen] Session error:', error);
+      }
       if (!data.session) {
+        console.warn('[PreviewScreen] No session, redirecting to /auth');
         router.replace('/auth');
+      } else {
+        console.log('[PreviewScreen] Session valid');
       }
     };
     ensureSession();
@@ -50,14 +57,18 @@ export const PreviewScreen: React.FC = () => {
 
   const handleConfirm = async () => {
     if (!photoUri) {
+      console.error('[PreviewScreen] No photo URI');
       Alert.alert('No photo found', 'Take a photo before confirming.');
       return;
     }
+    console.log('[PreviewScreen] Confirming action...');
     setIsSaving(true);
     try {
       const { streak } = await logEcoAction(photoUri);
+      console.log('[PreviewScreen] Action confirmed, streak:', streak);
       router.replace(`/success?streak=${streak}`);
     } catch (err: any) {
+      console.error('[PreviewScreen] Confirm failed:', err);
       Alert.alert('Could not log action', err?.message || 'Please try again.');
     } finally {
       setIsSaving(false);

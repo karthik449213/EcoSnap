@@ -1,28 +1,37 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import { useDemoAuth } from '@/lib/demoAuth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
 export const SplashScreen: React.FC = () => {
   const router = useRouter();
+  const { isAuthenticated } = useDemoAuth();
 
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      const { data } = await supabase.auth.getSession();
+      console.log('[SplashScreen] Checking authentication...');
+      
+      // Simulate splash delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       if (!isMounted) return;
-      if (data.session) {
+      
+      if (isAuthenticated) {
+        console.log('[SplashScreen] User authenticated, redirecting to /home');
         router.replace('/home');
       } else {
-        router.replace('/auth');
+        console.log('[SplashScreen] Not authenticated, redirecting to /welcome');
+        router.replace('/welcome');
       }
     };
+    
     load();
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [router, isAuthenticated]);
 
   return (
     <LinearGradient colors={["#E9F7EF", "#E0F2FE"]} style={styles.container}>

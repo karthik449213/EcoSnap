@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleMapsApiKey": "AIzaSyD3PPZFp3Nkh35nDWKKKyXMFH7l0pIrfC8"
     },
     "android": {
       "package": "com.ecosnap.app",
@@ -18,12 +19,11 @@
         "foregroundImage": "./assets/images/EcoSnap.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "allowBackup": false,
+      "googleMapsApiKey": "AIzaSyD3PPZFp3Nkh35nDWKKKyXMFH7l0pIrfC8"
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/EcoSnap.png"
-    },
+    "platforms": ["ios", "android", "web"],
     "plugins": [
       "expo-router",
       [
@@ -39,6 +39,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "updates": {
+      "enabled": false,
+      "fallbackToCacheTimeout": 0
     },
     "extra": {
       "router": {},
