@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 // Fake leaderboard data - realistic top 5 eco warriors
 const FAKE_LEADERBOARD = [
-  { rank: 1, name: 'EcoWarrior', avatar: '🌍', points: 12450, streak: 89, change: '↑' },
-  { rank: 2, name: 'GreenGuardian', avatar: '🌿', points: 11200, streak: 76, change: '↑' },
-  { rank: 3, name: 'PlanetSaver', avatar: '♻️', points: 10890, streak: 65, change: '→' },
-  { rank: 4, name: 'EcoNinja', avatar: '🥋', points: 9750, streak: 58, change: '↓' },
-  { rank: 5, name: 'GreenHero', avatar: '💚', points: 8920, streak: 48, change: '↑' },
+  { rank: 1, name: 'EcoWarrior', avatar: require('@/assets/images/1.png'), points: 12450, streak: 89, change: '↑' },
+  { rank: 2, name: 'GreenGuardian', avatar: require('@/assets/images/2.png'), points: 11200, streak: 76, change: '↑' },
+  { rank: 3, name: 'PlanetSaver', avatar: require('@/assets/images/3.png'), points: 10890, streak: 65, change: '→' },
+  { rank: 4, name: 'EcoNinja', avatar: require('@/assets/images/4.png'), points: 9750, streak: 58, change: '↓' },
+  { rank: 5, name: 'GreenHero', avatar: require('@/assets/images/5.png'), points: 8920, streak: 48, change: '↑' },
 ];
 
 export const Leaderboard: React.FC<{ currentUserPoints: number; currentUserRank: number }> = ({ 
@@ -35,7 +35,9 @@ export const Leaderboard: React.FC<{ currentUserPoints: number; currentUserRank:
             {/* User Info */}
             <View style={styles.userInfo}>
               <View style={styles.nameRow}>
-                <Text style={styles.avatar}>{user.avatar}</Text>
+                <View style={styles.avatarContainer}>
+                  <Image source={user.avatar} style={styles.avatarImage} resizeMode="cover" />
+                </View>
                 <View style={styles.nameColumn}>
                   <Text style={styles.name}>{user.name}</Text>
                   <View style={styles.streakRow}>
@@ -179,8 +181,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  avatar: {
-    fontSize: 24,
+  avatarContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#E0F2F1',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   nameColumn: {
     gap: 4,

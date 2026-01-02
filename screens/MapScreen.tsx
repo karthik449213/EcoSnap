@@ -1,3 +1,4 @@
+import { useDemoAuth } from '@/lib/demoAuth';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -11,7 +12,6 @@ import {
   View,
   Image 
 } from 'react-native';
-import { useDemoAuth } from '../lib/demoAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -245,7 +245,13 @@ export const MapScreen: React.FC = () => {
       <SafeAreaView style={styles.headerSafe}>
         <View style={styles.header}>
           <View style={styles.userInfo}>
-            <Text style={styles.avatar}>{currentUser?.avatar || '👤'}</Text>
+            {currentUser?.avatar ? (
+              <View style={styles.avatarContainer}>
+                <Image source={currentUser.avatar} style={styles.avatarImage} resizeMode="cover" />
+              </View>
+            ) : (
+              <Text style={styles.avatar}>👤</Text>
+            )}
             <View>
               <Text style={styles.userName}>{currentUser?.username || 'User'}</Text>
               <Text style={styles.userEmail}>{currentUser?.email}</Text>
@@ -382,6 +388,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#E0F2F1',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatar: {
     fontSize: 32,

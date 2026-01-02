@@ -34,15 +34,15 @@ export const CameraScreen: React.FC = () => {
     }
   }, [permission, requestPermission]);
 
+  // Allow demo users to access camera without strict authentication
   useEffect(() => {
     console.log('[CameraScreen] Checking authentication...');
-    if (!currentUser) {
-      console.warn('[CameraScreen] Not authenticated, redirecting to /welcome');
-      router.replace('/welcome');
-    } else {
+    if (currentUser) {
       console.log('[CameraScreen] User authenticated:', currentUser.username);
+    } else {
+      console.log('[CameraScreen] No user logged in, using demo mode');
     }
-  }, [router, currentUser]);
+  }, [currentUser]);
 
   // Capture photo on single tap
   const handleCapture = async () => {

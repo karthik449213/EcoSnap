@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -12,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useDemoAuth } from '../lib/demoAuth';
-import { MOCK_SNAP_HISTORY } from '../components/SnapHistory';
+import { useSnapsStore } from '../lib/snapsStore';
 
 const { width } = Dimensions.get('window');
 const GRID_SPACING = 4;
@@ -22,9 +23,25 @@ const ITEM_SIZE = (width - GRID_SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
 export default function SnapsScreen() {
   const router = useRouter();
   const { currentUser } = useDemoAuth();
+  const { snaps, deleteSnap } = useSnapsStore();
   const [filter, setFilter] = useState<string>('all');
+  const [snapsList, setSnapsList] = useState(snaps);
 
-  const getCategoryIcon = (category: string) => {
+  useFocusEffect(
+    useCallback(() => {
+      setSnapsList(snaps);
+      // Prefetch images for faster loading
+      snaps.forEach((snap) => {
+        if (typeof snap.imageUri === 'string') {
+          Image.prefetch(snap.imageUri).catch(() => {
+            // Silently handle prefetch errors
+          });
+        }
+      });
+    }, [snaps])
+  );
+
+  const getCategoryIcon = useCallback((category: string) => {
     switch (category) {
       case 'recycling':
         return 'repeat';
@@ -39,9 +56,9 @@ export default function SnapsScreen() {
       default:
         return 'camera';
     }
-  };
+  }, []);
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = useCallback((category: string) => {
     switch (category) {
       case 'recycling':
         return '#10B981';
@@ -56,14 +73,14 @@ export default function SnapsScreen() {
       default:
         return '#6B7280';
     }
-  };
+  }, []);
 
   const filteredSnaps =
     filter === 'all'
-      ? MOCK_SNAP_HISTORY
-      : MOCK_SNAP_HISTORY.filter((snap) => snap.category === filter);
+      ? snapsList
+      : snapsList.filter((snap) => snap.category === filter);
 
-  const totalPoints = MOCK_SNAP_HISTORY.reduce((sum, snap) => sum + snap.points, 0);
+  const totalPoints = snapsList.reduce((sum, snap) => sum + snap.points, 0);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -84,7 +101,7 @@ export default function SnapsScreen() {
       {/* Stats Bar */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{MOCK_SNAP_HISTORY.length}</Text>
+          <Text style={styles.statValue}>{snapsList.length}</Text>
           <Text style={styles.statLabel}>Total Snaps</Text>
         </View>
         <View style={styles.statDivider} />
@@ -142,26 +159,64 @@ export default function SnapsScreen() {
         numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={12}
+        scrollEventThrottle={16}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.9}>
-            <Image source={{ uri: item.imageUri }} style={styles.gridImage} resizeMode="cover" />
-            
-            {/* Overlay */}
-            <View style={styles.gridOverlay} />
-
-            {/* Category Badge */}
-            <View
-              style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}
+          <View style={styles.gridItem}>
+            <TouchableOpacity
+              style={styles.gridTouchable}
+              activeOpacity={0.9}
+              onPress={() => router.push(`/snap-detail?snapId=${item.id}`)}
             >
-              <Ionicons name={getCategoryIcon(item.category)} size={14} color="#FFFFFF" />
-            </View>
+              <Image 
+                source={typeof item.imageUri === 'string' ? { uri: item.imageUri } : item.imageUri}
+                style={styles.gridImage} 
+                resizeMode="cover" 
+              />
+              
+              {/* Overlay */}
+              <View style={styles.gridOverlay} />
 
-            {/* Points Badge */}
-            <View style={styles.pointsBadge}>
-              <Ionicons name="flash" size={12} color="#F59E0B" />
-              <Text style={styles.pointsValue}>+{item.points}</Text>
-            </View>
-          </TouchableOpacity>
+              {/* Category Badge */}
+              <View
+                style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}
+              >
+                <Ionicons name={getCategoryIcon(item.category)} size={14} color="#FFFFFF" />
+              </View>
+
+              {/* Points Badge */}
+              <View style={styles.pointsBadge}>
+                <Ionicons name="flash" size={12} color="#F59E0B" />
+                <Text style={styles.pointsValue}>+{item.points}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Delete Button */}
+            <TouchableOpacity
+              style={styles.deleteIconButton}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Snap',
+                  `Are you sure you want to delete "${item.title}"?`,
+                  [
+                    { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      onPress: () => {
+                        deleteSnap(item.id);
+                      },
+                      style: 'destructive',
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash" size={18} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -286,9 +341,15 @@ const styles = StyleSheet.create({
     height: ITEM_SIZE,
     margin: GRID_SPACING / 2,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: 'visible',
     position: 'relative',
     backgroundColor: '#E5E7EB',
+  },
+  gridTouchable: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
@@ -324,6 +385,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#1F2937',
+  },
+  deleteIconButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FEE2E2',
   },
   emptyContainer: {
     flex: 1,

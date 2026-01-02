@@ -36,7 +36,7 @@ export const DemoLoginScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <View style={styles.userAvatar}>
-                <Text style={styles.avatarText}>{user.avatar}</Text>
+                <Image source={user.avatar} style={styles.avatarImage} resizeMode="cover" />
               </View>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{user.username}</Text>
@@ -117,9 +117,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0F2F1',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  avatarText: {
-    fontSize: 28,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   userInfo: {
     flex: 1,

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useCallback } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSnapsStore } from '../lib/snapsStore';
 
 // Mock snap history data - in production, this would come from storage/database
 export const MOCK_SNAP_HISTORY = [
@@ -53,8 +54,16 @@ interface SnapHistoryProps {
 
 export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
   const router = useRouter();
+  const { snaps } = useSnapsStore();
+  const [displaySnaps, setDisplaySnaps] = useState(snaps);
 
-  const formatTimestamp = (date: Date) => {
+  useFocusEffect(
+    useCallback(() => {
+      setDisplaySnaps(snaps);
+    }, [snaps])
+  );
+
+  const formatTimestamp = useCallback((date: Date) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -63,9 +72,9 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
-  };
+  }, []);
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = useCallback((category: string) => {
     switch (category) {
       case 'recycling':
         return 'recycle';
@@ -80,9 +89,9 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
       default:
         return 'camera';
     }
-  };
+  }, []);
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = useCallback((category: string) => {
     switch (category) {
       case 'recycling':
         return '#10B981';
@@ -97,7 +106,7 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
       default:
         return '#6B7280';
     }
-  };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -119,14 +128,21 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
       {/* Horizontal Scrolling Snap Cards */}
       <ScrollView 
         horizontal 
+        scrollEventThrottle={16}
+        removeClippedSubviews={true} 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {MOCK_SNAP_HISTORY.map((snap) => (
-          <TouchableOpacity key={snap.id} style={styles.snapCard} activeOpacity={0.9}>
+        {displaySnaps.map((snap) => (
+          <TouchableOpacity 
+            key={snap.id} 
+            style={styles.snapCard} 
+            activeOpacity={0.9}
+            onPress={() => router.push(`/snap-detail?snapId=${snap.id}`)}
+          >
             {/* Snap Image */}
             <Image 
-              source={{ uri: snap.imageUri }} 
+              source={typeof snap.imageUri === 'string' ? { uri: snap.imageUri } : snap.imageUri}
               style={styles.snapImage}
               resizeMode="cover"
             />
@@ -173,7 +189,7 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
         <View style={styles.summaryItem}>
           <Ionicons name="images" size={20} color="#6B7280" />
           <Text style={styles.summaryText}>
-            <Text style={styles.summaryValue}>{MOCK_SNAP_HISTORY.length}</Text> snaps this week
+            <Text style={styles.summaryValue}>{displaySnaps.length}</Text> snaps this week
           </Text>
         </View>
         <View style={styles.summaryDivider} />
@@ -181,7 +197,7 @@ export const SnapHistory: React.FC<SnapHistoryProps> = ({ username }) => {
           <Ionicons name="trending-up" size={20} color="#10B981" />
           <Text style={styles.summaryText}>
             <Text style={styles.summaryValue}>
-              {MOCK_SNAP_HISTORY.reduce((sum, snap) => sum + snap.points, 0)}
+              {displaySnaps.reduce((sum, snap) => sum + snap.points, 0)}
             </Text> points earned
           </Text>
         </View>

@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 const todayString = () => new Date().toISOString().slice(0, 10);
@@ -30,8 +31,233 @@ const fetchLocation = async () => {
   }
 };
 
-export const logEcoAction = async (photoUri: string) => {
+// Demo user snap storage key
+const DEMO_SNAPS_KEY = 'demo_snaps';
+const INITIALIZED_USERS_KEY = 'initialized_users';
+
+export interface DemoSnap {
+  id: string;
+  userId: string;
+  imageUri: string;
+  title: string;
+  timestamp: string;
+  points: number;
+  category: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+// Default snaps to add for new users
+const DEFAULT_SNAPS: Omit<DemoSnap, 'userId' | 'id'>[] = [
+  {
+    imageUri: 'snap1.jpeg',
+    title: 'Recycling Plastic Bottles',
+    timestamp: new Date(2026, 0, 1, 10, 30).toISOString(),
+    points: 50,
+    category: 'recycling',
+    latitude: 40.7128,
+    longitude: -74.0060,
+  },
+  {
+    imageUri: 'snap2.jpeg',
+    title: 'Using Reusable Shopping Bag',
+    timestamp: new Date(2025, 11, 31, 14, 15).toISOString(),
+    points: 30,
+    category: 'reduction',
+    latitude: 40.7129,
+    longitude: -74.0061,
+  },
+  {
+    imageUri: 'snap3.jpeg',
+    title: 'Started Home Composting',
+    timestamp: new Date(2025, 11, 30, 9, 45).toISOString(),
+    points: 40,
+    category: 'composting',
+    latitude: 40.7130,
+    longitude: -74.0062,
+  },
+  {
+    imageUri: 'snap4.jpeg',
+    title: 'Plant-Based Meal Prep',
+    timestamp: new Date(2025, 11, 29, 12, 0).toISOString(),
+    points: 25,
+    category: 'food',
+    latitude: 40.7131,
+    longitude: -74.0063,
+  },
+  {
+    imageUri: 'snap5.jpeg',
+    title: 'Taking Public Transport',
+    timestamp: new Date(2025, 11, 28, 8, 30).toISOString(),
+    points: 35,
+    category: 'transport',
+    latitude: 40.7132,
+    longitude: -74.0064,
+  },
+];
+
+// Get all demo snaps
+export const getDemoSnaps = async (userId?: string): Promise<DemoSnap[]> => {
+  try {
+    const stored = await AsyncStorage.getItem(DEMO_SNAPS_KEY);
+    let allSnaps: DemoSnap[] = stored ? JSON.parse(stored) : [];
+    
+    // Migrate old Unsplash URLs to local filenames
+    allSnaps = allSnaps.map(snap => {
+      // Check if using old Unsplash URLs and convert to local filenames
+      if (snap.imageUri && snap.imageUri.includes('unsplash.com')) {
+        // Map Unsplash URLs to local files based on category
+        const urlToFilename: { [key: string]: string } = {
+          'photo-1532996122724': 'snap1.jpeg', // recycling
+          'photo-1542601906990': 'snap2.jpeg', // reduction/transport
+          'photo-1542838132-92c': 'snap3.jpeg', // composting
+          'photo-1611284446314': 'snap4.jpeg', // food
+          'photo-1558618666-fcd': 'snap5.jpeg', // transport
+        };
+        
+        for (const [urlPart, filename] of Object.entries(urlToFilename)) {
+          if (snap.imageUri.includes(urlPart)) {
+            return { ...snap, imageUri: filename };
+          }
+        }
+      }
+      return snap;
+    });
+    
+    if (userId) {
+      return allSnaps.filter(snap => snap.userId === userId);
+    }
+    return allSnaps;
+  } catch (error) {
+    console.error('[getDemoSnaps] Error:', error);
+    return [];
+  }
+};
+
+// Save demo snap
+export const saveDemoSnap = async (snap: DemoSnap): Promise<void> => {
+  try {
+    const snaps = await getDemoSnaps();
+    snaps.unshift(snap); // Add to beginning
+    await AsyncStorage.setItem(DEMO_SNAPS_KEY, JSON.stringify(snaps));
+    console.log('[saveDemoSnap] Snap saved successfully:', snap.id);
+  } catch (error) {
+    console.error('[saveDemoSnap] Error:', error);
+    throw error;
+  }
+};
+
+// Clear all demo snaps (for testing/reset)
+export const clearDemoSnaps = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(DEMO_SNAPS_KEY, JSON.stringify([]));
+    console.log('[clearDemoSnaps] All snaps cleared');
+  } catch (error) {
+    console.error('[clearDemoSnaps] Error:', error);
+    throw error;
+  }
+};
+
+// Delete a snap
+export const deleteSnap = async (snapId: string, userId?: string): Promise<void> => {
+  try {
+    const snaps = await getDemoSnaps();
+    // Filter out the snap to delete, and ensure it belongs to the current user if userId is provided
+    const filtered = snaps.filter(snap => {
+      if (snap.id === snapId) {
+        // Verify ownership if userId is provided
+        if (userId && snap.userId !== userId) {
+          console.warn('[deleteSnap] Snap does not belong to current user:', snapId);
+          return true; // Keep the snap if it doesn't belong to current user
+        }
+        return false; // Remove this snap
+      }
+      return true; // Keep all other snaps
+    });
+    await AsyncStorage.setItem(DEMO_SNAPS_KEY, JSON.stringify(filtered));
+    console.log('[deleteSnap] Snap deleted:', snapId);
+  } catch (error) {
+    console.error('[deleteSnap] Error:', error);
+    throw error;
+  }
+};
+
+// Initialize default snaps for a user
+export const initializeDefaultSnaps = async (userId: string): Promise<void> => {
+  try {
+    const initializedUsers = await AsyncStorage.getItem(INITIALIZED_USERS_KEY);
+    const initialized = initializedUsers ? JSON.parse(initializedUsers) : [];
+    
+    // Check if user already initialized
+    if (initialized.includes(userId)) {
+      console.log('[initializeDefaultSnaps] User already initialized:', userId);
+      return;
+    }
+    
+    // Add default snaps for this user
+    const snaps = await getDemoSnaps();
+    const defaultSnapsForUser = DEFAULT_SNAPS.map((snap, index) => ({
+      ...snap,
+      id: `default-snap-${userId}-${index}`,
+      userId: userId,
+    }));
+    
+    // Add to existing snaps
+    const updatedSnaps = [...defaultSnapsForUser, ...snaps];
+    await AsyncStorage.setItem(DEMO_SNAPS_KEY, JSON.stringify(updatedSnaps));
+    
+    // Mark user as initialized
+    initialized.push(userId);
+    await AsyncStorage.setItem(INITIALIZED_USERS_KEY, JSON.stringify(initialized));
+    
+    console.log('[initializeDefaultSnaps] Default snaps added for user:', userId);
+  } catch (error) {
+    console.error('[initializeDefaultSnaps] Error:', error);
+    throw error;
+  }
+};
+
+export const logEcoAction = async (photoUri: string, demoUserId?: string, currentStreak: number = 0) => {
   console.log('[logEcoAction] Starting action log for photo:', photoUri);
+  
+  // Check if this is a demo user
+  if (demoUserId) {
+    console.log('[logEcoAction] Demo mode - User ID:', demoUserId);
+    const { lat, lon } = await fetchLocation();
+    console.log('[logEcoAction] Location:', lat, lon);
+    
+    // Random category and points for demo
+    const categories = ['recycling', 'reduction', 'composting', 'food', 'transport'];
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    const points = Math.floor(Math.random() * 30) + 25; // 25-55 points
+    
+    const today = todayString();
+    
+    // Get last action date from stored snaps
+    const existingSnaps = await getDemoSnaps(demoUserId);
+    const lastSnapDate = existingSnaps.length > 0 ? existingSnaps[0].timestamp.slice(0, 10) : null;
+    const nextStreak = computeNextStreak(currentStreak, lastSnapDate, today);
+    
+    // Create demo snap
+    const demoSnap: DemoSnap = {
+      id: `snap-${Date.now()}`,
+      userId: demoUserId,
+      imageUri: photoUri,
+      title: `Eco Action - ${category}`,
+      timestamp: new Date().toISOString(),
+      points: points,
+      category: category,
+      latitude: lat,
+      longitude: lon,
+    };
+    
+    await saveDemoSnap(demoSnap);
+    console.log('[logEcoAction] Demo snap saved, streak:', nextStreak);
+    
+    return { streak: nextStreak };
+  }
+  
+  // Regular Supabase flow for authenticated users
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) {
     console.error('[logEcoAction] Session error:', sessionError);

@@ -56,7 +56,7 @@ export const HomeScreen: React.FC = () => {
                 <Text style={styles.signOutText}>Switch User</Text>
               </TouchableOpacity>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{currentUser.avatar}</Text>
+                <Image source={currentUser.avatar} style={styles.avatarImage} resizeMode="cover" />
               </View>
             </View>
           </View>
@@ -165,9 +165,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0F2F1',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  avatarText: {
-    fontSize: 28,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   signOutBtn: {
     backgroundColor: 'rgba(220,38,38,0.08)',

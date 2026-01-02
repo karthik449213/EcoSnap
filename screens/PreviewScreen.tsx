@@ -1,6 +1,6 @@
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { logEcoAction } from '@/lib/ecoActions';
-import { supabase } from '@/lib/supabase';
+import { useDemoAuth } from '@/lib/demoAuth';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,27 +10,16 @@ import { ActivityIndicator, Alert, Image, SafeAreaView, StyleSheet, Text, Toucha
 export const PreviewScreen: React.FC = () => {
   const { photoUri } = useLocalSearchParams<{ photoUri?: string }>();
   const router = useRouter();
+  const { currentUser } = useDemoAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [location, setLocation] = useState<string>('Fetching location...');
   const fallback = require('@/assets/images/1.png');
   const source = photoUri ? { uri: photoUri } : fallback;
 
+  // Allow demo users to preview photos without Supabase session
   useEffect(() => {
-    const ensureSession = async () => {
-      console.log('[PreviewScreen] Checking session...');
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('[PreviewScreen] Session error:', error);
-      }
-      if (!data.session) {
-        console.warn('[PreviewScreen] No session, redirecting to /auth');
-        router.replace('/auth');
-      } else {
-        console.log('[PreviewScreen] Session valid');
-      }
-    };
-    ensureSession();
-  }, [router]);
+    console.log('[PreviewScreen] Preview screen loaded in demo mode');
+  }, []);
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -64,7 +53,12 @@ export const PreviewScreen: React.FC = () => {
     console.log('[PreviewScreen] Confirming action...');
     setIsSaving(true);
     try {
-      const { streak } = await logEcoAction(photoUri);
+      // Pass demo user info if available
+      const { streak } = await logEcoAction(
+        photoUri, 
+        currentUser?.id, 
+        currentUser?.streak || 0
+      );
       console.log('[PreviewScreen] Action confirmed, streak:', streak);
       router.replace(`/success?streak=${streak}`);
     } catch (err: any) {

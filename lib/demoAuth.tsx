@@ -1,5 +1,7 @@
 // Demo authentication system - works on iOS, Android, and Web
 import { useContext, createContext, useState, useCallback, ReactNode } from 'react';
+import { ImageSourcePropType } from 'react-native';
+import { initializeDefaultSnaps } from './ecoActions';
 
 export interface DemoUser {
   id: string;
@@ -7,41 +9,41 @@ export interface DemoUser {
   email: string;
   ecoPoints: number;
   streak: number;
-  avatar: string;
+  avatar: ImageSourcePropType;
 }
 
 export const DEMO_USERS: DemoUser[] = [
   {
     id: 'demo-user-1',
-    username: 'Alex Green',
+    username: 'Alexa',
     email: 'alex@ecosnap.app',
     ecoPoints: 8500,
     streak: 42,
-    avatar: '🟢',
+    avatar: require('@/assets/images/girluse.jpg'),
   },
   {
     id: 'demo-user-2',
-    username: 'Jordan Earth',
-    email: 'jordan@ecosnap.app',
+    username: 'Manoj',
+    email: 'manoj@ecosnap.app',
     ecoPoints: 7200,
     streak: 28,
-    avatar: '🌍',
+    avatar: require('@/assets/images/jaw.jpg'),
   },
   {
     id: 'demo-user-3',
     username: 'Sam Nature',
-    email: 'sam@ecosnap.app',
+    email: 'sammm@gmail.com',
     ecoPoints: 9100,
     streak: 55,
-    avatar: '🌿',
+    avatar: require('@/assets/images/sam.jpg'),
   },
   {
     id: 'demo-user-4',
-    username: 'Casey Eco',
-    email: 'casey@ecosnap.app',
-    ecoPoints: 6800,
+    username: 'Karthikeya',
+    email: 'karthikpiinasi@gmail.com',
+    ecoPoints: 633800,
     streak: 21,
-    avatar: '♻️',
+    avatar: require('@/assets/images/rahgu.jpg'),
   },
   {
     id: 'demo-user-5',
@@ -49,7 +51,7 @@ export const DEMO_USERS: DemoUser[] = [
     email: 'river@ecosnap.app',
     ecoPoints: 12300,
     streak: 73,
-    avatar: '💧',
+    avatar: require('@/assets/images/user3.jpg'),
   },
 ];
 
@@ -78,6 +80,10 @@ export const DemoAuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       console.log('[DemoAuth] Logged in as:', user.username);
       setCurrentUser(user);
+      // Initialize default snaps for this user
+      initializeDefaultSnaps(user.id).catch(err => {
+        console.error('[DemoAuth] Failed to initialize default snaps:', err);
+      });
     } else {
       console.warn('[DemoAuth] User not found:', userIdOrUsername);
     }

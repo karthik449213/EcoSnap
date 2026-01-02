@@ -15,21 +15,21 @@ const originalWarn = console.warn;
 
 console.log = (...args) => {
   originalLog(...args);
-  if (global.HermesInternal) {
+  if ((global as any).HermesInternal) {
     originalLog('[Hermes]', ...args);
   }
 };
 
 console.error = (...args) => {
   originalError(...args);
-  if (global.HermesInternal) {
+  if ((global as any).HermesInternal) {
     originalError('[Hermes ERROR]', ...args);
   }
 };
 
 console.warn = (...args) => {
   originalWarn(...args);
-  if (global.HermesInternal) {
+  if ((global as any).HermesInternal) {
     originalWarn('[Hermes WARN]', ...args);
   }
 };
