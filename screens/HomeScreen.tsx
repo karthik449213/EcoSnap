@@ -4,6 +4,7 @@ import { StreakBadge } from '@/components/StreakBadge';
 import { Leaderboard } from '@/components/Leaderboard';
 import { SnapHistory } from '@/components/SnapHistory';
 import { useDemoAuth } from '@/lib/demoAuth';
+import { useApp } from '@/lib/appContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +15,7 @@ import { ActivityIndicator, Image, RefreshControl, SafeAreaView, ScrollView, Sty
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
   const { currentUser, logout } = useDemoAuth();
+  const { user: appUser } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -61,11 +63,11 @@ export const HomeScreen: React.FC = () => {
             </View>
           </View>
 
-          <StreakBadge streak={currentUser.streak} />
+          <StreakBadge streak={appUser.streakCount || currentUser?.streak || 0} />
 
           <View style={styles.cardRow}>
-            <InfoCard title="Current Streak" value={`${currentUser.streak} days`} subtitle="Keep it going" iconName="flame" />
-            <InfoCard title="Eco Points" value={`${currentUser.ecoPoints}`} subtitle="All-time" iconName="shield-checkmark" />
+            <InfoCard title="Current Streak" value={`${appUser.streakCount || currentUser?.streak || 0} days`} subtitle="Keep it going" iconName="flame" />
+            <InfoCard title="Eco Points" value={`${appUser.totalPoints || currentUser?.ecoPoints || 0}`} subtitle="All-time" iconName="shield-checkmark" />
           </View>
 
           <View style={styles.heroCard}>
@@ -102,6 +104,34 @@ export const HomeScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.circleCard}
+            onPress={() => router.push('/circles')}
+          >
+            <View style={styles.achievementsIconContainer}>
+              <Ionicons name="people" size={28} color="#6366F1" />
+            </View>
+            <View style={styles.achievementsContent}>
+              <Text style={styles.achievementsTitle}>Eco Circles</Text>
+              <Text style={styles.achievementsSubtitle}>Join or view your circles</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.missionsCard}
+            onPress={() => router.push('/missions')}
+          >
+            <View style={styles.missionsIconContainer}>
+              <Ionicons name="target" size={28} color="#8B5CF6" />
+            </View>
+            <View style={styles.missionsContent}>
+              <Text style={styles.missionsTitle}>Daily Missions</Text>
+              <Text style={styles.missionsSubtitle}>Complete challenges for bonus XP</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+
           <View style={styles.tipCard}>
             <Text style={styles.tipTitle}>Daily Tip</Text>
             <Text style={styles.tipBody}>Turn off taps while brushing to save up to 4 gallons of water.</Text>
@@ -110,7 +140,7 @@ export const HomeScreen: React.FC = () => {
           <SnapHistory username={currentUser.username} />
 
           <Leaderboard 
-            currentUserPoints={currentUser.ecoPoints} 
+            currentUserPoints={appUser.totalPoints || currentUser?.ecoPoints || 0} 
             currentUserRank={Math.floor(Math.random() * 500) + 1}
           />
         </ScrollView>
@@ -271,6 +301,40 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   achievementsSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  missionsCard: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  missionsIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#DDD6FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  missionsContent: {
+    flex: 1,
+  },
+  missionsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  missionsSubtitle: {
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,

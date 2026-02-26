@@ -1,6 +1,8 @@
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { logEcoAction } from '@/lib/ecoActions';
 import { useDemoAuth } from '@/lib/demoAuth';
+import { useApp } from '@/lib/appContext';
+import { Snap } from '@/lib/models';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -44,6 +46,8 @@ export const PreviewScreen: React.FC = () => {
     fetchLocation();
   }, []);
 
+  const { addSnap } = useApp();
+
   const handleConfirm = async () => {
     if (!photoUri) {
       console.error('[PreviewScreen] No photo URI');
@@ -54,13 +58,35 @@ export const PreviewScreen: React.FC = () => {
     setIsSaving(true);
     try {
       // Pass demo user info if available
-      const { streak } = await logEcoAction(
+      const result: any = await logEcoAction(
         photoUri, 
         currentUser?.id, 
         currentUser?.streak || 0
       );
-      console.log('[PreviewScreen] Action confirmed, streak:', streak);
-      router.replace(`/success?streak=${streak}`);
+      console.log('[PreviewScreen] Action confirmed, result:', result);
+
+      // create local snap object for context store
+      const newSnap: Snap = {
+        id: `local-${Date.now()}`,
+        imageUri: photoUri,
+        title: `Eco Action - ${result.actionType || 'unknown'}`,
+        timestamp: new Date(),
+        actionType: result.actionType || 'recycling',
+        ecoScore: result.ecoScore || 0,
+        points: result.ecoScore || 0,
+        ecoScoreBreakdown: result.breakdown || {
+          actionDifficulty: 0,
+          consistencyMultiplier: 1,
+          communityBoost: 0,
+          randomBonus: 1,
+        },
+        rarityDrop: result.rarity || undefined,
+      };
+      addSnap(newSnap);
+
+      // pass rarity if exists
+      const rarityParam = result.rarity ? `&rarity=${encodeURIComponent(JSON.stringify(result.rarity))}` : '';
+      router.replace(`/success?streak=${result.streak}${rarityParam}`);
     } catch (err: any) {
       console.error('[PreviewScreen] Confirm failed:', err);
       Alert.alert('Could not log action', err?.message || 'Please try again.');

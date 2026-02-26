@@ -220,17 +220,38 @@ export const initializeDefaultSnaps = async (userId: string): Promise<void> => {
 export const logEcoAction = async (photoUri: string, demoUserId?: string, currentStreak: number = 0) => {
   console.log('[logEcoAction] Starting action log for photo:', photoUri);
   
+  // helper to compute score and maybe rarity
+  const computeExtras = async (actionType: string) => {
+    // for now we don't have community data; stub to 0
+    const { ecoScore, breakdown } = await import('./services/scoringEngine').then(m =>
+      m.computeEcoScore(actionType as any, 1, 0)
+    );
+    const rarity = await import('./services/rewardEngine').then(m => m.rollRareDrop());
+    return { ecoScore, breakdown, rarity };
+  };
+
   // Check if this is a demo user
   if (demoUserId) {
     console.log('[logEcoAction] Demo mode - User ID:', demoUserId);
     const { lat, lon } = await fetchLocation();
     console.log('[logEcoAction] Location:', lat, lon);
     
-    // Random category and points for demo
+    // Random category and points for demo (will be overwritten by score)
     const categories = ['recycling', 'reduction', 'composting', 'food', 'transport'];
-    const category = categories[Math.floor(Math.random() * categories.length)];
+    let category = categories[Math.floor(Math.random() * categories.length)];
     const points = Math.floor(Math.random() * 30) + 25; // 25-55 points
-    
+
+    // attempt classification (placeholder)
+    try {
+      const { classifyEcoAction } = await import('./services/aiClassifier');
+      const result = await classifyEcoAction(photoUri);
+      if (result.confidenceScore > 0.8) {
+        category = result.predictedAction;
+      }
+    } catch (e) {
+      // ignore
+    }
+
     const today = todayString();
     
     // Get last action date from stored snaps
@@ -238,6 +259,9 @@ export const logEcoAction = async (photoUri: string, demoUserId?: string, curren
     const lastSnapDate = existingSnaps.length > 0 ? existingSnaps[0].timestamp.slice(0, 10) : null;
     const nextStreak = computeNextStreak(currentStreak, lastSnapDate, today);
     
+    // compute extras
+    const extras = await computeExtras(category);
+
     // Create demo snap
     const demoSnap: DemoSnap = {
       id: `snap-${Date.now()}`,
@@ -245,7 +269,7 @@ export const logEcoAction = async (photoUri: string, demoUserId?: string, curren
       imageUri: photoUri,
       title: `Eco Action - ${category}`,
       timestamp: new Date().toISOString(),
-      points: points,
+      points: extras.ecoScore,
       category: category,
       latitude: lat,
       longitude: lon,
@@ -254,7 +278,7 @@ export const logEcoAction = async (photoUri: string, demoUserId?: string, curren
     await saveDemoSnap(demoSnap);
     console.log('[logEcoAction] Demo snap saved, streak:', nextStreak);
     
-    return { streak: nextStreak };
+    return { streak: nextStreak, actionType: category, ...extras };
   }
   
   // Regular Supabase flow for authenticated users
@@ -329,5 +353,20 @@ export const logEcoAction = async (photoUri: string, demoUserId?: string, curren
   }
   console.log('[logEcoAction] Action logged successfully, streak:', nextStreak);
 
-  return { streak: nextStreak };
+  // compute scoring breakdown for this action
+  let actionType = 'recycling'; // default; in a real implementation we would pass or classify or infer from metadata
+  try {
+    const { classifyEcoAction } = await import('./services/aiClassifier');
+    const result = await classifyEcoAction(photoUri);
+    if (result.confidenceScore > 0.8) {
+      actionType = result.predictedAction;
+    }
+  } catch {}
+
+  const { computeEcoScore } = await import('./services/scoringEngine');
+  const { ecoScore, breakdown } = computeEcoScore(actionType as any, nextStreak, 0);
+  const { rollRareDrop } = await import('./services/rewardEngine');
+  const rarity = rollRareDrop();
+
+  return { streak: nextStreak, actionType, ecoScore, breakdown, rarity };
 };

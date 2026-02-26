@@ -1,6 +1,7 @@
 import '@/lib/devConfig';
 import { DemoAuthProvider } from '@/lib/demoAuth';
 import { SnapsProvider } from '@/lib/snapsStore';
+import { AppProvider } from '@/lib/appContext';
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from 'react-native';
 import { useState, useEffect } from 'react';
@@ -27,7 +28,8 @@ export default function RootLayout() {
   return (
     <DemoAuthProvider>
       <SnapsProvider>
-        <Stack
+        <AppProvider>
+          <Stack
           screenOptions={{
             headerTitleStyle: { fontWeight: '800', color: '#065F46' },
             headerTintColor: '#065F46',
@@ -44,8 +46,12 @@ export default function RootLayout() {
           <Stack.Screen name="preview" options={{ title: 'Preview' }} />
           <Stack.Screen name="success" options={{ headerShown: false }} />
           <Stack.Screen name="snap-detail" options={{ title: 'Snap Details', headerShown: false }} />
-        </Stack>
-      </SnapsProvider>
+          <Stack.Screen name="community-impact" options={{ title: 'Community Impact' }} />
+          <Stack.Screen name="circles" options={{ title: 'Eco Circles' }} />
+          <Stack.Screen name="circle/[id]" options={{ title: 'Circle Details' }} />
+          <Stack.Screen name="missions" options={{ headerShown: false }} />
+          <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
+        </Stack>        </AppProvider>      </SnapsProvider>
     </DemoAuthProvider>
   );
 }

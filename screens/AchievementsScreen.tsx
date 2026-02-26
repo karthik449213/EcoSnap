@@ -2,11 +2,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { useApp } from '@/lib/appContext';
 import { Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export const AchievementsScreen: React.FC = () => {
   const router = useRouter();
-  const [ecoPoints] = useState(8500);
+  const { user } = useApp();
+  const ecoPoints = user.totalPoints; // reflect real points
+  const [showStreakBanner, setShowStreakBanner] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const prevHistoryLen = React.useRef<number>(user.streakHistory.length);
+  const prevLevel = React.useRef<number>(user.level);
+
+  React.useEffect(() => {
+    if (user.level > prevLevel.current) {
+      setShowLevelUp(true);
+      setTimeout(() => setShowLevelUp(false), 2500);
+      prevLevel.current = user.level;
+    }
+  }, [user.level]);
+
+  React.useEffect(() => {
+    if (user.streakHistory.length > prevHistoryLen.current) {
+      const entry = user.streakHistory[user.streakHistory.length - 1];
+      if (entry.preserved) {
+        setShowStreakBanner(true);
+        setTimeout(() => setShowStreakBanner(false), 3000);
+      }
+      prevHistoryLen.current = user.streakHistory.length;
+    }
+  }, [user.streakHistory]);
 
   const achievements = [
     {
@@ -76,6 +101,12 @@ export const AchievementsScreen: React.FC = () => {
   return (
     <LinearGradient colors={['#A7D7C5', '#C5F0E3']} style={styles.container}>
       <SafeAreaView style={styles.safe}>
+        {/* Level up modal */}
+        {showLevelUp && (
+          <View style={styles.levelUpOverlay}>
+            <Text style={styles.levelUpText}>Level {user.level}!</Text>
+          </View>
+        )}
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -86,12 +117,39 @@ export const AchievementsScreen: React.FC = () => {
             <View>
               <Text style={styles.pointsLabel}>Eco-Points</Text>
               <Text style={styles.pointsValue}>{ecoPoints.toLocaleString()}</Text>
+              {/* XP progress bar */}
+              <View style={styles.xpContainer}>
+                <Text style={styles.xpText}>Level {user.level}</Text>
+                <View style={styles.xpBarBackground}>
+                  <View
+                    style={[
+                      styles.xpBarFill,
+                      { width: `${
+                        (user.totalXP / (Math.pow(user.level + 1, 2) * 100)) * 100
+                      }%` },
+                    ]}
+                  />
+                </View>
+              </View>
             </View>
           </View>
           <TouchableOpacity onPress={() => router.push('/home')}>
             <Ionicons name="menu" size={28} color="#1F2937" />
           </TouchableOpacity>
         </View>
+        {showStreakBanner && (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>
+              Your streak was saved using a protection token 🔥
+            </Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.impactButton}
+          onPress={() => router.push('/community-impact')}
+        >
+          <Text style={styles.impactButtonText}>View Community Impact 📊</Text>
+        </TouchableOpacity>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -341,5 +399,63 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: 24,
+  },  xpContainer: {
+    marginTop: 4,
+    width: 150,
+  },
+  xpText: {
+    fontSize: 10,
+    color: '#374151',
+    marginBottom: 2,
+  },
+  xpBarBackground: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: 6,
+    backgroundColor: '#10B981',
+  },
+  banner: {
+    backgroundColor: '#FEF3C7',
+    padding: 8,
+    marginHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  bannerText: {
+    color: '#B45309',
+    fontWeight: '600',
+  },
+  levelUpOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  levelUpText: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  impactButton: {
+    marginTop: 10,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+  },
+  impactButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
   },
 });
